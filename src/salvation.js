@@ -4,13 +4,14 @@
  *
  * Validates forms.
  *
- * @version 0.1
+ * @version 0.2
  * @author Ardalan Samimi
  */
 (function(window) {
     // The default settings
     var defaults = {
-        element: false
+        element:    false,
+        dateFormat: "MM/DD/YYYY"
     }
 
     Salvation = function (options) {
@@ -22,6 +23,7 @@
         this.children   = this.getElementsByTagName(this.element, "input");
         this.required   = this.getElementsByAttribute(this.children, "required");
         this.specials   = {
+            date:         this.getElementsByAttribute(this.children, "data-date"),
             length:         this.getElementsByAttribute(this.children, "data-length"),
             numeric:        this.getElementsByAttribute(this.children, "data-format", "numeric"),
             alphanumeric:   this.getElementsByAttribute(this.children, "data-format", "alphanumeric")
@@ -29,7 +31,8 @@
         this.patterns   = {
             length:         '^(.{X,Y}$)',
             numeric:        /^(\d)+$/,
-            alphanumeric:   /^([\d|\w])+$/
+            alphanumeric:   /^([\d|\w])+$/,
+            date:           '([0-9]{M})(.)([0-9]{D})(.)([0-9]{Y})'
         }
 
         this.bindEvents();
@@ -170,6 +173,8 @@
             // the values specified in the attribute.
             if (type === "length") {
                 for (i = 0; i < elements.length; i++) {
+                    if (elements[i].value.length === 0)
+                        continue;
                     // Check length attribute specifies both a min and max
                     // length, if not add a "0," for the regex to work.
                     var length = elements[i].getAttribute("data-" + type);
@@ -184,6 +189,33 @@
                     if (string.test(elements[i].value) === false)
                         foundElements.push(elements[i]);
                 }
+            } else if (type === "date") {
+                var validDatePattern = rule;
+                var delimiterPattern = new RegExp(/([\W])/);
+                var delimiterMatches;
+                for (i = 0; i < elements.length; i++) {
+                    if (elements[i].value.length === 0)
+                        continue;
+                    var format = elements[i].getAttribute("data-date");
+                    if ((delimiterMatches = delimiterPattern.exec(format)) !== null) {
+                        var dateComponents = format.split(delimiterMatches[0]);
+                        for (x = 0; x < dateComponents.length; x++) {
+                            var needle = dateComponents[x][0];
+                            var search = new RegExp(needle, "ig");
+                            validDatePattern = validDatePattern.replace(search, dateComponents[x].length);
+                        }
+                        // Insert the delimiter as well
+                        var needle = '\\(\\.\\)';
+                        var search = new RegExp(needle, 'g');
+                        validDatePattern = validDatePattern.replace(search, "(\\"+delimiterMatches[0]+")");
+                        // Test the date
+                        var date = new RegExp(validDatePattern);
+                        if (date.test(elements[i].value) === false) {
+                            foundElements.push(elements[i]);
+                        }
+                    }
+                }
+
             } else {
                 var string = new RegExp(rule);
                 for (i = 0; i < elements.length; i++) {
