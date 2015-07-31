@@ -4,14 +4,13 @@
  *
  * Validates forms.
  *
- * @version 0.2
+ * @version 0.2.1
  * @author Ardalan Samimi
  */
 (function(window) {
     // The default settings
     var defaults = {
-        element:    false,
-        dateFormat: "MM/DD/YYYY"
+        element:    false
     }
 
     Salvation = function (options) {
@@ -31,8 +30,7 @@
         this.patterns   = {
             length:         '^(.{X,Y}$)',
             numeric:        /^(\d)+$/,
-            alphanumeric:   /^([\d|\w])+$/,
-            date:           '([0-9]{M})(.)([0-9]{D})(.)([0-9]{Y})'
+            alphanumeric:   /^([\d|\w])+$/
         }
 
         this.bindEvents();
@@ -72,7 +70,7 @@
          * @param       string      The event type
          * @param       function    The event listener
          */
-        addEventListenerToElements: function (elements, event, callback) {
+        addEventListener: function (elements, event, callback) {
             elements.map(function (element) {
                 element.addEventListener(event, callback);
             });
@@ -97,7 +95,7 @@
                 var emptyFields = self.getElementsByValue(self.required, "");
                 if (emptyFields.length > 0) {
                     self.addClassToElements(emptyFields, self.validationFailedStyle);
-                    self.addEventListenerToElements(emptyFields, "keyup", callback);
+                    self.addEventListener(emptyFields, "keyup", callback);
                     event.preventDefault();
                 }
                 // The special fields
@@ -105,10 +103,12 @@
                     var specialFields = self.getElementsByPattern(self.specials[special], self.patterns[special], special);
                     if (specialFields.length > 0) {
                         self.addClassToElements(specialFields, self.validationFailedStyle);
-                        self.addEventListenerToElements(specialFields, "keyup", callback);
+                        self.addEventListener(specialFields, "keyup", callback);
                         event.preventDefault();
                     }
                 }
+                event.preventDefault();
+
             });
         },
         /**
@@ -190,38 +190,72 @@
                         foundElements.push(elements[i]);
                 }
             } else if (type === "date") {
-                var validDatePattern = rule;
-                var delimiterPattern = new RegExp(/([\W])/);
-                var delimiterMatches;
+                var delimiterPattern = new RegExp(/([\W])/), delimiterMatches;
                 for (i = 0; i < elements.length; i++) {
-                    if (elements[i].value.length === 0)
+                    var elementValue = elements[i].value;
+                    if (elementValue.length === 0)
                         continue;
+                    // Retrieve the date format from the element
                     var format = elements[i].getAttribute("data-date");
                     if ((delimiterMatches = delimiterPattern.exec(format)) !== null) {
                         var dateComponents = format.split(delimiterMatches[0]);
+                        var dateBrokenDown = elementValue.split(delimiterMatches[0]);
+                        var date = [];
+                        // Begin the date pattern
+                        var validDatePattern = "^(";
+                        // Build the date pattern
                         for (x = 0; x < dateComponents.length; x++) {
-                            var needle = dateComponents[x][0];
-                            var search = new RegExp(needle, "ig");
-                            validDatePattern = validDatePattern.replace(search, dateComponents[x].length);
+                            // Create an array out of the components and inputed date
+                            // for later use, to make sure that it is an actual date.
+                            var key = dateComponents[x][0].toUpperCase();
+                            date[key] = dateBrokenDown[x];
+                            // Dates and months should have a interval length,
+                            // so that if they are set to max 2 digits (MM) the
+                            // user should not have to write a leading zero, as
+                            // this often isn't how date parsers read a date.
+                            if (key !== "Y")
+                                var length = "1," + dateComponents[x].length;
+                            else
+                                var length = dateComponents[x].length;
+                            // Keep building that pattern, man.
+                            validDatePattern += "\\d{" + length + "}";
+                            // Add the delimiter, but not to the last digit
+                            if (dateComponents.length > x+1)
+                                validDatePattern += "\\" + delimiterMatches[0];
                         }
-                        // Insert the delimiter as well
-                        var needle = '\\(\\.\\)';
-                        var search = new RegExp(needle, 'g');
-                        validDatePattern = validDatePattern.replace(search, "(\\"+delimiterMatches[0]+")");
+                        // Close the date pattern
+                        validDatePattern += ")$";
                         // Test the date
-                        var date = new RegExp(validDatePattern);
-                        if (date.test(elements[i].value) === false) {
+                        var validDate = new RegExp(validDatePattern);
+                        if (validDate.test(elementValue) === false) {
                             foundElements.push(elements[i]);
+                        } else {
+                            // Even if the date has the right format, it may not be an
+                            // actual date. This will make sure that the date exists.
+                            // The date must be four digits, so add the first two digits
+                            // if they are missing.
+                            if (date["Y"].length == 2)
+                                date["Y"] = new Date().getFullYear().toString().substr(0,2) + date["Y"];
+                            // Also, remove 0 if month and date begins with one.
+                            date["M"] = date["M"].replace(/^0/, '');
+                            date["D"] = date["D"].replace(/^0/, '');
+                            // Create the date object, and retrieve the individual
+                            // components to compare it to the inputed date. If the
+                            // date is wrong, the parsed date will not be the same
+                            // as the user inputed one.
+                            var dateObject = new Date(date["Y"], (date["M"]-1), date["D"]);
+                            var dateParsed = dateObject.getFullYear() +''+ (dateObject.getMonth()+1) +''+ dateObject.getDate();
+                            var dateString = date["Y"] +''+ date["M"] +''+ date["D"];
+                            if (dateParsed != dateString)
+                                foundElements.push(elements[i]);
                         }
                     }
                 }
-
             } else {
                 var string = new RegExp(rule);
-                for (i = 0; i < elements.length; i++) {
+                for (i = 0; i < elements.length; i++)
                     if (elements[i].value.length > 0 && string.test(elements[i].value) === false)
                         foundElements.push(elements[i]);
-                }
             }
             return foundElements;
         }
