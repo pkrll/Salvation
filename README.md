@@ -37,21 +37,23 @@ Using Salvation is easy and requires very little effort to take advantage of the
 
 ##### Attributes
 ```html
-    <input type="text" data-validate="required"></p>
-    <input type="text"data-validate="numeric" data-length="5" data-format="min">
+    <input type="text" data-validate="required">
+    <input type="text" data-validate="numeric, length" data-length="5" data-format="min">
     <input type="text" data-length="1,">
     <input type="text" data-validate="date" data-format="DD/MM/YYYY">
-</form>
 ```
-* `data-validate`: Sets the validation rule. The built-in rules are as follows:
-   * `required`: The field can not be empty (you can get the same effect by using the HTML5 ``required`` attribute, as the plugin also includes these, but please note that modern browsers already check for those).
+* `data-validate`: Sets the validation rule. Can have multiple values (i.e. `data-validate="required, numeric"`). The built-in rules are as follows:
+   * `required`: The field can not be empty.
    * `numeric`: The field can only contain numbers.
    * `alphanumeric`: The field can only contain letters, numbers and underscore.
    * `date`: The field must be a valid date, formatted as specified by the data-format attribute (or the default formatting rule). Salvation will check upon validation if the inputed date actually exists.
+   * `length`: The field must have a certain length (see below).
    * You can also create your own rules by setting a custom value to `data-validate` and passing a custom regular expression when initializing the plugin (see below for an example).
-* `data-length`: Specifies a minimum and/or maximum length, delimited by a comma (i.e. `data-length="5,10"`).
-   * `5`: A single digit will set the maximum length.
-   * `5,`: A single digit, followed by a comma, sets the minimum length.
+* `data-length`: Specifies a minimum and/or maximum length, delimited by a comma. It is not required, although recommended, to be used with the `data-validate="length"` option.
+   * Formatting:
+      * `5`: A single digit will set the maximum length.
+      * `5,`: A single digit, followed by a comma, sets the minimum length.
+      * `5,10`: Two digits, delimited by a comma, sets minimum and maximum length.
 * `data-format`: Formatting option for the date fields (i.e. `data-format="YY/MM/DD"`). This will override the default format. Can also be used to set the value of the length attribute to be either a maximum or minimum limit (`data-format="min/max"`). The `data-length` attribute must in that case only contain digits.
 
 #### Customization
@@ -73,4 +75,4 @@ Salvation is also easily extendable and can take custom validation rules (as reg
     </script>
 ```
 #### Author
-Ardalan Samimi
+* Salvation was created by Ardalan Samimi.

@@ -4,7 +4,7 @@
  *
  * Validates forms.
  *
- * @version 0.3.0
+ * @version 0.3.1
  * @author Ardalan Samimi
  */
 (function(window) {
@@ -16,6 +16,7 @@
     }
     // The default patterns
     var patterns = {
+        required        :/\S/,
         length          :'^(.{X,Y}$)',
         numeric         :/^(\d)+$/,
         alphanumeric    :/^([\d|\w])+$/
@@ -44,11 +45,12 @@
             // It's common courtesy for date fields to
             // display which format they should be in,
             // but only if the plugin user thinks so.
-            if (this.settings.datePlaceholder)
-                self.specials.date.map(function(element) {
-                    var format = (element.getAttribute("data-format") === null) ? self.settings.dateFormat : element.getAttribute("data-format");
-                    element.setAttribute("placeholder", format);
-                });
+            if (this.settings.datePlaceholder) {
+                for (i = 0; i < self.validate.date.length; i++) {
+                    var format = (self.validate.date[i].getAttribute("data-format") === null) ? self.settings.dateFormat : self.validate.date[i].getAttribute("data-format");
+                    self.validate.date[i].setAttribute("placeholder", format);
+                }
+            }
             self.validationFailedStyle = "wrong";
         } else {
             return new Salvation(settings);
@@ -59,15 +61,17 @@
         /**
          * Gather all the children elements of the form,
          * and sort them according to their types, i.e.
-         * all date elements inside this.specials.date.
+         * all date elements inside validate.date.
          *
          * @returns     void
          */
         gatherElements: function() {
-            this.children = this.getElementsByTagName(this.element, "input");
-            this.required = this.getElementsByAttributes(this.children, "required,data-required");
-            this.specials = this.getElementsByAttributeAsObject(this.children, "data-validate");
-            this.specials.length    = this.getElementsByAttribute(this.children, "data-length");
+            this.children = this.getElementsByTagName(this.element, "input, select, textarea");
+            this.validate = this.getElementsByAttributeAsObject(this.children, "data-validate");
+            // For backward compatibility: if data-validate="length" is not specified,
+            // and only the data-length attribute is set, those should be added to the
+            // validation elements too, by using the extend method. Nifty.
+            this.validate.length = this.extend(this.validate.length, this.getElementsByAttribute(this.children, "data-length"));
         },
         /**
          * Extend the default options with
@@ -114,46 +118,43 @@
         bindEvents: function() {
             var self = this;
             // Callback for the addEventListener method, defined
-            // this way to keep the references. Removes both the
-            // invalid class and event listener after it's called.
+            // this way to keep the references. (Previous version:
+            // (Removes both the invalid class marker and the event
+            // listener after it's called)
             var callback = function() {
                 if (self.checkElementByPattern(this)) {
                     if (this.classList.contains(self.validationFailedStyle))
                         this.classList.remove(self.validationFailedStyle);
-                    this.removeEventListener("keyup", arguments.callee, false);
+                    // this.removeEventListener("change", arguments.callee, false);
+                } else {
+                    if (this.classList.contains(self.validationFailedStyle) === false)
+                        this.classList.add(self.validationFailedStyle);
                 }
             }
             // The validation process
             this.element.addEventListener("submit", function (event) {
-                // Check required fields first
-                var emptyFields = self.getElementsByValue(self.required, "");
-                if (emptyFields.length > 0) {
-                    self.addClassToElements(emptyFields, self.validationFailedStyle);
-                    self.addEventListener(emptyFields, "keyup", callback);
-                    event.preventDefault();
-                }
-                // The special fields
-                for (special in self.specials) {
-                    var specialFields = self.getElementsByPattern(self.specials[special], self.patterns[special], special);
-                    if (specialFields.length > 0) {
-                        self.addClassToElements(specialFields, self.validationFailedStyle);
-                        self.addEventListener(specialFields, "keyup", callback);
+                for (field in self.validate) {
+                    var validateFields = self.getElementsByPattern(self.validate[field], self.patterns[field], field);
+                    if (validateFields.length > 0) {
+                        self.addClassToElements(validateFields, self.validationFailedStyle);
+                        self.addEventListener(validateFields, "change", callback);
                         event.preventDefault();
                     }
                 }
-                event.preventDefault();
-
             });
         },
         /**
-         * Find elements by tag name.
+         * Find elements by tag name(s).
          *
-         * @param       element     Element to search within
-         * @param       string      Tag name to find
-         * @returns     array       List of elements found
+         * @param       element         Element to search within
+         * @param       string          Tag name(s) to find
+         * @returns     HTMLCollection  List of elements
          */
         getElementsByTagName: function (element, tagName) {
-            return element.getElementsByTagName(tagName);
+            if (tagName.indexOf(",") === -1)
+                return element.getElementsByTagName(tagName);
+            else
+                return element.querySelectorAll(tagName);
         },
         /**
          * Find elements by attribute name, with option
@@ -182,7 +183,7 @@
         /**
          * Same as getElementsByAttribute, but can instead search
          * for multiple attributes, as set in the attribute param
-         * delimited by a comma.
+         * delimited by a comma. (Deprecated)
          *
          * @param       elements    Array of elements to search
          * @param       string      Attribute(s) to find, delmited by a comma.
@@ -195,7 +196,7 @@
             // the /\s/g makes sure any whitespace is removed.
             var attributes = attributes.replace(/\s/g, '').split(",");
             for (i = 0; i < elements.length; i++) {
-                // Go through each element of the attributes array
+                // Go through each item of the attributes array
                 attributes.map(function(attribute) {
                     if (value !== null) {
                         if (elements[i].getAttribute(attribute) === value && foundElements.indexOf(elements[i]) === -1)
@@ -212,6 +213,10 @@
         /**
          * Find elements by attribute name, and return
          * them as an object with attribute value as key.
+         * This method will sort elements in different
+         * objects, depending on attributes. An element
+         * with multiple attribute values will be added
+         * to multiple objects.
          *
          * @param       elements    Array of elements to search
          * @param       string      Attribute to find
@@ -219,22 +224,34 @@
          */
         getElementsByAttributeAsObject: function (elements, attribute) {
             var foundElements = {};
-            for (i = 0; i < elements.length; i++) {
-                // The attribute will also serve as the key
-                // in the object that will be returned.
-                var key = elements[i].getAttribute(attribute);
-                if (key !== undefined && key !== null) {
-                    // Check that the element[key] is an array, otherwise
-                    // the push function will not work.
-                    if (foundElements[key] === undefined || foundElements[key].constructor !== Array)
-                        foundElements[key] = [];
-                    foundElements[key].push(elements[i]);
+                for (i = 0; i < elements.length; i++) {
+                    var attributeValues = elements[i].getAttribute(attribute);
+                    if (attributeValues === undefined || attributeValues === null)
+                        continue;
+                    // Because elements can have multiple attribute values,
+                    // delimited by a comma, split the attribute string and
+                    // loop through each value and add it to the object. The
+                    // /\s/g makes sure any whitespace is removed from the
+                    // attributes value ("value1, value2" => ["value1","value2"]).
+                    attributeValues = attributeValues.replace(/\s/g, '').split(",");
+                    for (x = 0; x < attributeValues.length; x++) {
+                        // The attribute value will also serve as the
+                        // key in the object that will be returned.
+                        var key = attributeValues[x];
+                        if (key !== undefined && key !== null) {
+                        // Check that the element[key] is an array, otherwise
+                        // the push function will not work.
+                        if (foundElements[key] === undefined || foundElements[key].constructor !== Array)
+                            foundElements[key] = [];
+                            foundElements[key].push(elements[i]);
+                        }
+                    }
                 }
-            }
+
             return foundElements;
         },
         /**
-         * Find elements by their values.
+         * Find elements by their values. (Deprecated)
          *
          * @param       elements    Array of elements to search
          * @param       string      Value to find
@@ -374,8 +391,10 @@
             } else {
                 var string = new RegExp(rule);
                 for (i = 0; i < elements.length; i++)
-                    if (elements[i].value.length > 0 && string.test(elements[i].value) === false)
-                        foundElements.push(elements[i]);
+                    if (string.test(elements[i].value) === false)
+                        if (type === "required" ||
+                            type !== "required" && elements[i].value.length > 1)
+                            foundElements.push(elements[i]);
             }
             return foundElements;
         },
@@ -387,19 +406,26 @@
          * @returns     bool        True on valid
          */
         checkElementByPattern: function (element) {
+            // Begin with checking the validate
+            var elementAsArray = [ element ], foundElement = [];
             var validationType = element.getAttribute("data-validate");
-            if (validationType === null)
-                validationType = element.getAttribute("required");
-            if (validationType === null)
-                if (element.getAttribute("data-length") !== null)
-                    validationType = "length";
-            if (validationType === null)
-                return null;
-            var elementAsArray = [ element ];
-            var elementPattern = this.patterns[validationType];
-            foundElements = this.getElementsByPattern(elementAsArray, elementPattern, validationType);
-            if (foundElements.length > 0)
-                return false;
+            if (validationType !== null) {
+                validationType = validationType.replace(/\s/g, "").split(",");
+                for (i = 0; i < validationType.length; i++)
+                    foundElement = this.getElementsByPattern(elementAsArray, this.patterns[validationType[i]], validationType[i]);
+                if (foundElement.length > 0)
+                    return false;
+            }
+            // As data-validate="length" has already been checked,
+            // only check the elements with data-length set.
+            if (element.getAttribute("data-length") !== null &&
+                validationType.indexOf("length") === -1) {
+                validationType = "length";
+                foundElement = this.getElementsByPattern(elementAsArray, this.patterns["length"], validationType);
+                if (foundElement.length > 0)
+                    return false;
+            }
+
             return true;
         }
     }
