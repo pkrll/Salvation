@@ -12,7 +12,8 @@
     var defaults = {
         element         : false,
         dateFormat      : "MM/DD/YYYY",
-        datePlaceholder : true
+        datePlaceholder : true,
+        defaultLabel    : "Invalid value"
     }
     // The default patterns
     var patterns = {
@@ -21,6 +22,7 @@
         numeric         :/^(\d)+$/,
         alphanumeric    :/^([\d|\w])+$/
     }
+
     /**
      * Initialize the Salvation plugin.
      *
@@ -52,6 +54,9 @@
                 }
             }
             self.validationFailedStyle = "wrong";
+            this.labels = {
+                required: "Please fill out this field.",
+            }
         } else {
             return new Salvation(settings);
         }
@@ -94,9 +99,14 @@
          * @param       array       An array of elements to manipulate
          * @param       string      Name of class
          */
-        addClassToElements: function (elements, className) {
+        addClassToElements: function (elements, className, label) {
+            var label = label || this.settings.defaultLabel;
             elements.map(function (element) {
                 element.classList.add(className);
+                var errorDiv = document.createElement("div");
+                errorDiv.setAttribute("class", "salvation-warning");
+                errorDiv.innerHTML = label;
+                element.parentNode.insertBefore(errorDiv, element.nextSibling);
             });
         },
         /**
@@ -125,6 +135,10 @@
                 if (self.checkElementByPattern(this)) {
                     if (this.classList.contains(self.validationFailedStyle))
                         this.classList.remove(self.validationFailedStyle);
+                    var nextSibling = this.nextSibling;
+                    console.log(nextSibling);
+                    if (nextSibling instanceof HTMLElement && nextSibling.getAttribute("class") === "salvation-warning")
+                        nextSibling.parentNode.removeChild(nextSibling);
                     // this.removeEventListener("change", arguments.callee, false);
                 } else {
                     if (this.classList.contains(self.validationFailedStyle) === false)
@@ -136,7 +150,7 @@
                 for (field in self.validate) {
                     var validateFields = self.getElementsByPattern(self.validate[field], self.patterns[field], field);
                     if (validateFields.length > 0) {
-                        self.addClassToElements(validateFields, self.validationFailedStyle);
+                        self.addClassToElements(validateFields, self.validationFailedStyle, self.labels[field]);
                         self.addEventListener(validateFields, "change", callback);
                         event.preventDefault();
                     }
@@ -393,7 +407,7 @@
                 for (i = 0; i < elements.length; i++)
                     if (string.test(elements[i].value) === false)
                         if (type === "required" ||
-                            type !== "required" && elements[i].value.length > 1)
+                            type !== "required" && elements[i].value.length > 0)
                             foundElements.push(elements[i]);
             }
             return foundElements;
