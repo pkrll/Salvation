@@ -4,10 +4,15 @@
  *
  * Validates forms.
  *
- * @version 0.3.1
+ * @version 0.3.2 going on 0.4.0
  * @author Ardalan Samimi
  */
-(function(window) {
+(function() {
+
+    Element.prototype.addSalvation = function (options, rules) {
+        return new Salvation(options, rules, this);
+    }
+
     // The default settings
     var defaults = {
         element         : false,
@@ -29,7 +34,7 @@
      * @param       object  The settings
      * @returns     object  An instance of Salvation
      */
-    Salvation = function (options, userPatterns) {
+    Salvation = function (options, userPatterns, element) {
         // Auto-instantiates if the object was
 		// not called with the new-keyword.
         if (this instanceof Salvation) {
@@ -38,8 +43,7 @@
             // exit if the element is not set.
             self.patterns = self.extend(patterns, userPatterns);
             self.settings = self.extend(defaults, options);
-            if (self.settings.element === false) return null;
-            self.element = self.settings.element;
+            self.element = (self.settings.element === false) ? element : self.settings.element;
             // Gather all the validation elements and
             // bind the submit event to validate.
             self.gatherElements();
@@ -121,37 +125,33 @@
                 element.addEventListener(event, callback);
             });
         },
+        liveValidation: function(event) {
+            var targetElement = event.target, self = this;
+            if (this.checkElementByPattern(targetElement)) {
+                if (targetElement.classList.contains(this.validationFailedStyle))
+                    targetElement.classList.remove(this.validationFailedStyle);
+                var nextSibling = event.target.nextSibling;
+                if (nextSibling instanceof HTMLElement && nextSibling.getAttribute("class") === "salvation-warning")
+                    nextSibling.parentNode.removeChild(nextSibling);
+            } else {
+                if (!targetElement.classList.contains(this.validationFailedStyle))
+                    targetElement.classList.add(this.validationFailedStyle);
+            }
+        },
         /**
          * Sets the actual validation control.
          *
          */
         bindEvents: function() {
             var self = this;
-            // Callback for the addEventListener method, defined
-            // this way to keep the references. (Previous version:
-            // (Removes both the invalid class marker and the event
-            // listener after it's called)
-            var callback = function() {
-                if (self.checkElementByPattern(this)) {
-                    if (this.classList.contains(self.validationFailedStyle))
-                        this.classList.remove(self.validationFailedStyle);
-                    var nextSibling = this.nextSibling;
-                    console.log(nextSibling);
-                    if (nextSibling instanceof HTMLElement && nextSibling.getAttribute("class") === "salvation-warning")
-                        nextSibling.parentNode.removeChild(nextSibling);
-                    // this.removeEventListener("change", arguments.callee, false);
-                } else {
-                    if (this.classList.contains(self.validationFailedStyle) === false)
-                        this.classList.add(self.validationFailedStyle);
-                }
-            }
+            // Will check field validation while editing.
+            this.element.addEventListener("change", self.liveValidation.bind(this));
             // The validation process
             this.element.addEventListener("submit", function (event) {
                 for (field in self.validate) {
                     var validateFields = self.getElementsByPattern(self.validate[field], self.patterns[field], field);
                     if (validateFields.length > 0) {
                         self.addClassToElements(validateFields, self.validationFailedStyle, self.labels[field]);
-                        self.addEventListener(validateFields, "change", callback);
                         event.preventDefault();
                     }
                 }
@@ -444,4 +444,4 @@
         }
     }
 
-})(window, document);
+})();
