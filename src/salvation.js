@@ -1,18 +1,18 @@
 /**
  * Salvation validation
- * A JavaScript Plugin
+ * A JavaScript Plugin.
  *
  * Validates forms.
  *
- * @version 0.3.2 going on 0.4.0
+ * @version 0.4.0
  * @author Ardalan Samimi
  */
 (function() {
-
-    Element.prototype.addSalvation = function (options, rules) {
+    // Only HTMLFormElements should be extended
+    HTMLFormElement.prototype.addSalvation = function (options, rules) {
+        options.element = false;
         return new Salvation(options, rules, this);
     }
-
     // The default settings
     var defaults = {
         element         : false,
@@ -20,142 +20,175 @@
         datePlaceholder : true,
         defaultLabel    : "Invalid value"
     }
-    // The default patterns
     var patterns = {
         required        :/\S/,
         length          :'^(.{X,Y}$)',
         numeric         :/^(\d)+$/,
         alphanumeric    :/^([\d|\w])+$/
     }
-
     /**
      * Initialize the Salvation plugin.
      *
      * @param       object  The settings
      * @returns     object  An instance of Salvation
      */
-    Salvation = function (options, userPatterns, element) {
+    Salvation = function (paramSettings, paramPatterns, element) {
         // Auto-instantiates if the object was
 		// not called with the new-keyword.
         if (this instanceof Salvation) {
-            var self = this;
-            // Extend the default settings, but
-            // exit if the element is not set.
-            self.patterns = self.extend(patterns, userPatterns);
-            self.settings = self.extend(defaults, options);
-            self.element = (self.settings.element === false) ? element : self.settings.element;
-            // Gather all the validation elements and
-            // bind the submit event to validate.
-            self.gatherElements();
-            self.bindEvents();
-            // It's common courtesy for date fields to
-            // display which format they should be in,
-            // but only if the plugin user thinks so.
-            if (this.settings.datePlaceholder) {
-                for (i = 0; i < self.validate.date.length; i++) {
-                    var format = (self.validate.date[i].getAttribute("data-format") === null) ? self.settings.dateFormat : self.validate.date[i].getAttribute("data-format");
-                    self.validate.date[i].setAttribute("placeholder", format);
-                }
+            this.settings = this.extend(defaults, paramSettings);
+            // Extend patterns variable, But switch places with
+            // the user defined and default patterns to make
+            // sure that the defaults doesn't get overwritten.
+            this.patterns = this.extend(paramPatterns, patterns);
+            this.stylings = {
+                error   : "salvation-error",
+                clear   : "salvation-clear"
             }
-            self.validationFailedStyle = "wrong";
-            this.labels = {
-                required: "Please fill out this field.",
-            }
+            this.invalidElements = [];
+            // If the element was not created using the constructor pattern, the element
+            // was not set in the options object and must have therefore been extended.
+            this.element = (this.settings.element === false) ? element : this.settings.element;
+            // Elements with data-validate-attribute are the only ones that should be validated,
+            // but make exception for data-length types.
+            var childNode = this.getElementsByTagName(this.element, "input, select, textarea");
+            this.validate = this.getElementsByAttributeAsObject(childNode, "data-validate");
+            // For backward-compatibility: if data-validate="length" is not specified,
+            // and only the data-length attribute is set, those should be added to the
+            // validation elements too, by using the extend method.
+            this.validate.length = this.extend(this.validate.length, this.getElementsByAttribute(childNode, "data-length"));
+            // Initialize the validation process
+            this.element.addEventListener("submit", this.deadValidation.bind(this));
+            this.element.addEventListener("change", this.liveValidation.bind(this));
+            // Push dynamically added form elements to the validation array
+            this.element.addEventListener("DOMNodeInserted", this.nodeInserted.bind(this));
         } else {
-            return new Salvation(settings);
+            return new Salvation(paramSettings, paramPatterns, element);
         }
     }
 
     Salvation.prototype = {
         /**
-         * Gather all the children elements of the form,
-         * and sort them according to their types, i.e.
-         * all date elements inside validate.date.
+         * Make a array out of a string
+         * delimited by a comma.
          *
-         * @returns     void
+         * @param       string
+         * @returns     array
          */
-        gatherElements: function() {
-            this.children = this.getElementsByTagName(this.element, "input, select, textarea");
-            this.validate = this.getElementsByAttributeAsObject(this.children, "data-validate");
-            // For backward compatibility: if data-validate="length" is not specified,
-            // and only the data-length attribute is set, those should be added to the
-            // validation elements too, by using the extend method. Nifty.
-            this.validate.length = this.extend(this.validate.length, this.getElementsByAttribute(this.children, "data-length"));
+        splitStringByComma: function (attribute) {
+            return attribute.replace(/\s/g, "").split(",");
         },
         /**
-         * Extend the default options with
-         * user inputed ones.
+         * Extend a given object with
+         * another object.
          *
-         * @param       object      Default settings
-         * @param       object      User defined settings
+         * @param       object      Object that is to be extended
+         * @param       object      Object with properties to add to first object
          * @returns     object
          */
-        extend: function (defaults, options) {
-            var option;
-            for (option in options)
-                if (options.hasOwnProperty(option))
-                    defaults[option] = options[option];
-            return defaults;
+        extend: function (primary, secondary) {
+            var primary = primary || {};
+            for (var property in secondary)
+                if (secondary.hasOwnProperty(property))
+                    primary[property] = secondary[property];
+            return primary;
         },
         /**
-         * Add a given class to a collection of elements.
+         * Callback function for event submit.
+         * Validates elements, but will first
+         * check if the global "formInvalid"-
+         * variable is set, before validation.
          *
-         * @param       array       An array of elements to manipulate
-         * @param       string      Name of class
+         * @param       Event
          */
-        addClassToElements: function (elements, className, label) {
-            var label = label || this.settings.defaultLabel;
-            elements.map(function (element) {
-                element.classList.add(className);
-                var errorDiv = document.createElement("div");
-                errorDiv.setAttribute("class", "salvation-warning");
-                errorDiv.innerHTML = label;
-                element.parentNode.insertBefore(errorDiv, element.nextSibling);
-            });
-        },
-        /**
-         * Add an event listener to all elements in an array.
-         *
-         * @param       array       An array of elements to manipulate
-         * @param       string      The event type
-         * @param       function    The event listener
-         */
-        addEventListener: function (elements, event, callback) {
-            elements.map(function (element) {
-                element.addEventListener(event, callback);
-            });
-        },
-        liveValidation: function(event) {
-            var targetElement = event.target, self = this;
-            if (this.checkElementByPattern(targetElement)) {
-                if (targetElement.classList.contains(this.validationFailedStyle))
-                    targetElement.classList.remove(this.validationFailedStyle);
-                var nextSibling = event.target.nextSibling;
-                if (nextSibling instanceof HTMLElement && nextSibling.getAttribute("class") === "salvation-warning")
-                    nextSibling.parentNode.removeChild(nextSibling);
-            } else {
-                if (!targetElement.classList.contains(this.validationFailedStyle))
-                    targetElement.classList.add(this.validationFailedStyle);
+        deadValidation: function (event) {
+            var self = this;
+            if (this.invalidElements.length > 0) {
+                event.preventDefault();
+
+            }
+            // Even if the invalidElements count
+            // does not indicate any invalidated
+            // elements, the plugin should make
+            // sure that there are none that did
+            // somehow bypass the control. This
+            // is an issue mainly when submitting
+            // without editing a form.
+            for (var validationType in self.validate) {
+                var invalidFields = self.getElementsByPattern(self.validate[validationType], self.patterns[validationType], validationType);
+                if (invalidFields.length > 0) {
+                    this.invalidElements = invalidFields;
+                    event.preventDefault();
+                    // The warning method
+                    self.onInvalidation(invalidFields);
+                }
             }
         },
         /**
-         * Sets the actual validation control.
+         * Callback function for the change
+         * event. Validates elements live.
          *
+         * @param       Event
          */
-        bindEvents: function() {
-            var self = this;
-            // Will check field validation while editing.
-            this.element.addEventListener("change", self.liveValidation.bind(this));
-            // The validation process
-            this.element.addEventListener("submit", function (event) {
-                for (field in self.validate) {
-                    var validateFields = self.getElementsByPattern(self.validate[field], self.patterns[field], field);
-                    if (validateFields.length > 0) {
-                        self.addClassToElements(validateFields, self.validationFailedStyle, self.labels[field]);
-                        event.preventDefault();
+        liveValidation: function(event) {
+            var target = event.target;
+            if (this.checkElementByPattern(target)) {
+                if (this.invalidElements.indexOf(target) > -1)
+                    this.invalidElements.splice(this.invalidElements.indexOf(target), 1);
+                this.onValidation([target]);
+            } else {
+                if (this.invalidElements.indexOf(target) === -1)
+                    this.invalidElements.push(target);
+                this.onInvalidation([target]);
+            }
+        },
+        /**
+         * Callback for DOMNodeInserted.
+         * Adds inserted element to the
+         * elements list, if it has the
+         * appropriate attributes.
+         *
+         * @param       Event
+         */
+        nodeInserted: function (event) {
+            // Check if the node is a child of the plugin's element.
+            if (event.relatedNode === this.element) {
+                var attributeValues = event.target.getAttribute("data-validate");
+                if (attributeValues !== null) {
+                    attributeValues = this.splitStringByComma(attributeValues);
+                    for (var x = 0; x < attributeValues.length; x++) {
+                        var key = attributeValues[x];
+                        if (key === undefined || key === null)
+                            continue;
+                        this.validate[key].push(event.target);
                     }
                 }
-            });
+                if (event.target.hasAttribute("data-length") &&
+                    this.validate["length"].indexOf(event.target) === -1)
+                    this.validate["length"].push(event.target);
+            }
+        },
+        /**
+         * Description of what this does.
+         *
+         * @param
+         * @returns
+         */
+        onInvalidation: function (elements) {
+            var elements = elements || [];
+            for (var i = 0; i < elements.length; i++) {
+                if (elements[i].classList.contains(this.stylings.error) === false)
+                    elements[i].classList.add(this.stylings.error);
+                if (i === 0)
+                    elements[i].focus();
+            }
+        },
+        onValidation: function (elements) {
+            var elements = elements || [];
+            for (var i = 0; i < elements.length; i++) {
+                if (elements[i].classList.contains(this.stylings.error))
+                    elements[i].classList.remove(this.stylings.error);
+            }
         },
         /**
          * Find elements by tag name(s).
@@ -167,8 +200,7 @@
         getElementsByTagName: function (element, tagName) {
             if (tagName.indexOf(",") === -1)
                 return element.getElementsByTagName(tagName);
-            else
-                return element.querySelectorAll(tagName);
+            return element.querySelectorAll(tagName);
         },
         /**
          * Find elements by attribute name, with option
@@ -205,21 +237,19 @@
          * @returns     array       List of elements found
          */
         getElementsByAttributes: function (elements, attributes, value) {
-            var foundElements = [], value = value || null;
-            // Split the attribute string by the comma-delimiter,
-            // the /\s/g makes sure any whitespace is removed.
-            var attributes = attributes.replace(/\s/g, '').split(",");
+            var foundElements = [], value = value || null, attributes = this.splitStringByComma(attributes);
             for (i = 0; i < elements.length; i++) {
-                // Go through each item of the attributes array
-                attributes.map(function(attribute) {
-                    if (value !== null) {
-                        if (elements[i].getAttribute(attribute) === value && foundElements.indexOf(elements[i]) === -1)
+                for (x = 0; x < attributes.length; x++) {
+                    if (value === null) {
+                        if (elements[i].getAttribute(attributes[x]) !== value &&
+                            foundElements.indexOf(elements[i]) === -1)
                             foundElements.push(elements[i]);
                     } else {
-                        if (elements[i].getAttribute(attribute) !== null && foundElements.indexOf(elements[i]) === -1)
+                        if (elements[i].getAttribute(attributes[x]) === value &&
+                            foundElements.indexOf(elements[i]) === -1)
                             foundElements.push(elements[i]);
                     }
-                });
+                }
             }
 
             return foundElements;
@@ -238,27 +268,24 @@
          */
         getElementsByAttributeAsObject: function (elements, attribute) {
             var foundElements = {};
-                for (i = 0; i < elements.length; i++) {
-                    var attributeValues = elements[i].getAttribute(attribute);
-                    if (attributeValues === undefined || attributeValues === null)
-                        continue;
-                    // Because elements can have multiple attribute values,
-                    // delimited by a comma, split the attribute string and
-                    // loop through each value and add it to the object. The
-                    // /\s/g makes sure any whitespace is removed from the
-                    // attributes value ("value1, value2" => ["value1","value2"]).
-                    attributeValues = attributeValues.replace(/\s/g, '').split(",");
-                    for (x = 0; x < attributeValues.length; x++) {
+            for (i = 0; i < elements.length; i++) {
+                var attributeValues = elements[i].getAttribute(attribute);
+                if (attributeValues === undefined || attributeValues === null)
+                    continue;
+                    // Elements can have multiple attribute values,
+                    // the string should be delimited by a comma.
+                    attributeValues = this.splitStringByComma(attributeValues);
+                    for (var x = 0; x < attributeValues.length; x++) {
                         // The attribute value will also serve as the
                         // key in the object that will be returned.
                         var key = attributeValues[x];
-                        if (key !== undefined && key !== null) {
-                        // Check that the element[key] is an array, otherwise
-                        // the push function will not work.
+                        if (key === undefined || key === null)
+                            continue;
+                        // The key must exist in the element as an
+                        // array, otherwise push() will fail.
                         if (foundElements[key] === undefined || foundElements[key].constructor !== Array)
                             foundElements[key] = [];
                             foundElements[key].push(elements[i]);
-                        }
                     }
                 }
 
@@ -273,7 +300,7 @@
          */
         getElementsByValue: function (elements, value) {
             var foundElements = [];
-            for (i = 0; i < elements.length; i++)
+            for (var i = 0; i < elements.length; i++)
                 if (elements[i].value === value)
                     foundElements.push(elements[i]);
             return foundElements;
@@ -292,18 +319,24 @@
             // of the search pattern (X,Y) first must be replaced by
             // the value(s) specified in the attribute.
             if (type === "length") {
-                for (i = 0; i < elements.length; i++) {
+                for (var i = 0; i < elements.length; i++) {
+                    // Length attribute is not a substitute for the
+                    // required attribute. Length just states what
+                    // min/max-length an element should have, if it
+                    // is filled in.
+                    if (elements[i].value === "")
+                        continue;
                     var length = elements[i].getAttribute("data-length");
                     var format = elements[i].getAttribute("data-format");
-                    // Format can be either max or min
+                    // Format can be either max or min. The length
+                    // attribute combined with the format attribute
+                    // must only contain one digit for it to be
+                    // considered valid.
                     if (format === "max") {
-                        // The length attribute combined with the format
-                        // attribute must only contain one digit for it
-                        // to be considered valid.
                         if (/^([0-9]$)/.test(length))
                             var string = new RegExp(rule.replace("X,Y", "0," + length));
                         else
-                            continue
+                            continue;
                     } else if (format === "min") {
                         if (/^([0-9]$)/.test(length))
                             var string = new RegExp(rule.replace("X,Y", length + ","));
@@ -330,17 +363,16 @@
                             // value, skip this one and move to the next.
                             continue;
                     }
-                    // Test the length
                     if (string.test(elements[i].value) === false)
                         foundElements.push(elements[i]);
                 }
-            // Date is also a special case, where the regex pattern
-            // needs to be build depending on the format specified.
             } else if (type === "date") {
+                // Date is also a special case, where the regex pattern
+                // needs to be build depending on the format specified.
                 // The date delimiter can be almost any non-word
                 // character, therefore the regex pattern \W.
                 var delimiterPattern = new RegExp(/([\W])/), delimiterMatches;
-                for (i = 0; i < elements.length; i++) {
+                for (var i = 0; i < elements.length; i++) {
                     var elementValue = elements[i].value;
                     if (elementValue.length < 1)
                         continue;
@@ -354,12 +386,12 @@
                         var date = [];
                         // Begin building the date pattern
                         var validDatePattern = "^(";
-                        for (x = 0; x < dateComponents.length; x++) {
+                        for (var x = 0; x < dateComponents.length; x++) {
                             // Create an array out of the components and inputed date
                             // for later use, to make sure that it is an actual date.
                             var key = dateComponents[x][0].toUpperCase();
                             date[key] = dateBrokenDown[x];
-                            // Dates and months should have an interval length,
+                            // Dates and months should have an interval-length,
                             // so that if they are set to max 2 digits (MM) the
                             // user should not have to write a leading zero, as
                             // this often isn't how date parsers read a date.
@@ -367,7 +399,6 @@
                                 var length = "1," + dateComponents[x].length;
                             else
                                 var length = dateComponents[x].length;
-                            // Keep building that pattern, man.
                             validDatePattern += "\\d{" + length + "}";
                             // Add the delimiter, but not to the last digit.
                             if (dateComponents.length > x+1)
@@ -375,7 +406,6 @@
                         }
                         // Close the date pattern.
                         validDatePattern += ")$";
-                        // Test the date
                         var validDate = new RegExp(validDatePattern);
                         if (validDate.test(elementValue) === false) {
                             foundElements.push(elements[i]);
@@ -404,11 +434,15 @@
                 }
             } else {
                 var string = new RegExp(rule);
-                for (i = 0; i < elements.length; i++)
-                    if (string.test(elements[i].value) === false)
+                for (var i = 0; i < elements.length; i++) {
+                    if (string.test(elements[i].value) === false) {
                         if (type === "required" ||
                             type !== "required" && elements[i].value.length > 0)
                             foundElements.push(elements[i]);
+                    }
+
+                }
+
             }
             return foundElements;
         },
@@ -421,24 +455,26 @@
          */
         checkElementByPattern: function (element) {
             // Begin with checking the validate
-            var elementAsArray = [ element ], foundElement = [];
-            var validationType = element.getAttribute("data-validate");
+            var elementAsArray = [ element ],
+                validationType = element.getAttribute("data-validate") || null;
+                invalidElement = [];
             if (validationType !== null) {
-                validationType = validationType.replace(/\s/g, "").split(",");
-                for (i = 0; i < validationType.length; i++)
-                    foundElement = this.getElementsByPattern(elementAsArray, this.patterns[validationType[i]], validationType[i]);
-                if (foundElement.length > 0)
-                    return false;
+                validationType = this.splitStringByComma(validationType);
+                for (var i = 0; i < validationType.length; i++) {
+                    invalidElement = this.getElementsByPattern(elementAsArray, this.patterns[validationType[i]], validationType[i]);
+                    if (invalidElement.length > 0)
+                        return false;
+                }
             }
             // As data-validate="length" has already been checked,
             // only check the elements with data-length set.
-            if (element.getAttribute("data-length") !== null &&
-                validationType.indexOf("length") === -1) {
-                validationType = "length";
-                foundElement = this.getElementsByPattern(elementAsArray, this.patterns["length"], validationType);
-                if (foundElement.length > 0)
-                    return false;
-            }
+            if (element.getAttribute("data-length") === null ||
+                validationType !== null && validationType.indexOf("length") !== -1)
+                return true;
+            validationType = "length";
+            invalidElement = this.getElementsByPattern(elementAsArray, this.patterns[validationType], validationType);
+            if (invalidElement.length > 0)
+                return false;
 
             return true;
         }
