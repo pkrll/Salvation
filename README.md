@@ -23,9 +23,9 @@ Add the following to the bottom of the page:
      var salvation = new Salvation({
          element: document.getElementById("form")
      });
-     // You can also call the plugin by extending the form element:
+     // You can also call the plugin like this:
      document.getElementById("form").addSalvation({
-         dateFormat: "MM/DD/YYYY"
+         // Options
      });
 </script>
 ```
