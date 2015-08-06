@@ -1,6 +1,11 @@
 ### Salvation
 A lightweight, easy-to-use form validation tool, written entirely in JavaScript and with no library dependencies. Also, a work in progress.
 
+### Installation
+##### Install with NPM
+```bash
+$ npm install salvation
+```
 ### Usage
 Using Salvation is easy and requires very little effort to take advantage of the built-in validation rules. Just create the form elements and declare the validation rules in the `data-validate` attribute, like so:
 ```html
