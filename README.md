@@ -1,39 +1,46 @@
 ### Salvation
-A lightweight, easy to use form validation tool, written entirely in JavaScript and with no library dependencies. Also, a work in progress.
+A lightweight, easy-to-use form validation tool, written entirely in JavaScript and with no library dependencies. Also, a work in progress.
 
 ### Usage
-Using Salvation is easy and requires very little effort to take advantage of the built-in validation rules. Below follows a quick start guide:
-* Create the form and add the validation type (the attribute data-validate):
+Using Salvation is easy and requires very little effort to take advantage of the built-in validation rules. Just create the form elements and declare the validation rules in the `data-validate` attribute, like so:
 ```html
 <form id="form">
     <p><input type="text" name="username" data-validate="required"></p>
-    <p><input type="password" name="password" required="required"></p>
-    <p><input type="text" name="income" data-validate="numeric" data-length="5" data-format="min"></p>
-    <p><input type="text" name="some-other-field" data-validate="alphanumeric" data-length="1,5"></p>
-    <p><input type="text" name="date" data-validate="date" data-format="YY/MM/DD"></p>
+    <p><input type="password" name="password" data-validate="required, length" data-length="10" data-format="min"></p>
+    <p><input type="text" name="email" data-validate="email"></p>
+    <p><input type="text" name="birthday" data-validate="date" data-format="YY/MM/DD"></p>
     <p><input type="submit" /></p>
 </form>
 ```
-* Add the following to the bottom of the page.
+Add the following to the bottom of the page:
 ```js
 <script type="text/javascript">
      var salvation = new Salvation({
          element: document.getElementById("form")
      });
+     // You can also call the plugin by extending the form element:
+     document.getElementById("form").addSalvation({
+         dateFormat: "MM/DD/YYYY"
+     });
 </script>
 ```
 #### Options
+Salvation is highly adjustable. You can override default settings by passing options to the plugin, as outlined below:
 ##### Properties
 ```js
     new Salvation({
         element         :   document.getElementById("element"),
         dateFormat      :   "MM/DD/YYYY",
-        datePlaceholder :   true
+        datePlaceholder :   true,
+        onInvalidation  :   function (elements) { /* ... */ },
+        onValidation    :   function (elements) { /* ... */ }
     });
 ```
-* `element`: The form element to validate (**required**).
-* `dateFormat`: The default validation rule for the date fields. This setting will be used if the attribute *data-format* is not set. If the `data-format` is set on one element, the default format will be overridden (`default: mm/dd/yyyy`).
-* `datePlaceholder`: If set true, the date fields will display which date format they are set to (`default: true`).
+* `element`: The form element to validate. This property is required *only* when initializing plugin with constructor pattern (new-keyword).
+* `dateFormat`: Global formatting rule for date validation. This setting will be used if the local attribute `data-format` is not set on an element. If `data-format` is defined on one element, then the default format will be overridden on that individual element (`default: mm/dd/yyyy`).
+* `datePlaceholder`: If true, the date fields will display the date format they are set to (`default: true`).
+* `onInvalidation`: To override the default onInvalidation method, called when an element fails validation, define this property as a function. The method takes one parameter, which is an array containing the invalid form elements. The default method can be accessed by the user-overriden method with `this.defaultOnInvalidation()`).
+* `onValidation`: To override the default onValidation method, called when an element that previously failed validation has been validated. Must also be defineed as a function. The method takes one parameter, which is an array containing the form elements that passed validation. The default method can be accessed by the user-overriden method with `this.defaultOnValidation()`).
 
 ##### Attributes
 ```html
@@ -46,8 +53,9 @@ Using Salvation is easy and requires very little effort to take advantage of the
    * `required`: The field can not be empty.
    * `numeric`: The field can only contain numbers.
    * `alphanumeric`: The field can only contain letters, numbers and underscore.
-   * `date`: The field must be a valid date, formatted as specified by the data-format attribute (or the default formatting rule). Salvation will check upon validation if the inputed date actually exists.
-   * `length`: The field must have a certain length (see below).
+   * `date`: The field value must be a valid date, formatted as specified by the data-format attribute (or the default formatting rule). Salvation will check upon validation if the inputed date actually exists.
+   * `email`: The field value must be a valid e-mail address.
+   * `length`: The field value must have a certain length (see below).
    * You can also create your own rules by setting a custom value to `data-validate` and passing a custom regular expression when initializing the plugin (see below for an example).
 * `data-length`: Specifies a minimum and/or maximum length, delimited by a comma. It is not required, although recommended, to be used with the `data-validate="length"` option.
    * Formatting:

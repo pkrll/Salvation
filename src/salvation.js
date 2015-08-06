@@ -4,7 +4,7 @@
  *
  * Validates forms.
  *
- * @version 0.4.0
+ * @version 0.5.0
  * @author Ardalan Samimi
  */
 (function() {
@@ -18,13 +18,16 @@
         element         : false,
         dateFormat      : "MM/DD/YYYY",
         datePlaceholder : true,
-        defaultLabel    : "Invalid value"
+        defaultLabel    : "Invalid value",
+        onValidation    : function(elements) {},
+        onInvalidation  : function(elements) {}
     }
     var patterns = {
         required        :/\S/,
         length          :'^(.{X,Y}$)',
         numeric         :/^(\d)+$/,
-        alphanumeric    :/^([\d|\w])+$/
+        alphanumeric    :/^([\d|\w])+$/,
+        email           :/^(\w+)[\@](([A-z1-9ÅåÄäÖö]+){3,63}\.[A-z]{2,})$/
     }
     /**
      * Initialize the Salvation plugin.
@@ -45,6 +48,7 @@
                 error   : "salvation-error",
                 clear   : "salvation-clear"
             }
+            this.publicInterface = this.setPublicInterface();
             this.invalidElements = [];
             // If the element was not created using the constructor pattern, the element
             // was not set in the options object and must have therefore been extended.
@@ -62,12 +66,55 @@
             this.element.addEventListener("change", this.liveValidation.bind(this));
             // Push dynamically added form elements to the validation array
             this.element.addEventListener("DOMNodeInserted", this.nodeInserted.bind(this));
+            // Return the pseudo-public methods
+            return this.publicInterface;
         } else {
             return new Salvation(paramSettings, paramPatterns, element);
         }
     }
 
     Salvation.prototype = {
+        /**
+         * Creates an object of pseudo-public
+         * methods that will be returned when
+         * the plugin is initialized.
+         *
+         * @returns     Object
+         */
+        setPublicInterface: function () {
+            var emptyFunction = new RegExp(/(\{\s\})|(\{\})/),
+                publicMethods = {};
+            for (property in this.settings) {
+                if (typeof this.settings[property] == 'function' &&
+                    typeof this[property] == 'function') {
+                    var method = this.settings[property];
+                    if (emptyFunction.test(method)) {
+                        publicMethods[property] = this[property];
+                    } else {
+                        var defaultMethodName = this.createDefaultMethodName(property);
+                        publicMethods[property] = this.settings[property];
+                        publicMethods[defaultMethodName] = this[property];
+                    }
+                }
+            }
+
+            publicMethods.stylings = this.stylings;
+
+            return publicMethods;
+        },
+        /**
+         * Prepends method name with string
+         * "default", using camelCase.
+         *
+         * @param       string      Name to manipulate
+         * @returns     string
+         */
+        createDefaultMethodName: function(name) {
+            if (/[A-Z]/.test(name.charAt(0)))
+                return "default" + name;
+            var firstLetter = name.charAt(0);
+            return "default" + firstLetter.toUpperCase() + name.substring(1);
+        },
         /**
          * Make a array out of a string
          * delimited by a comma.
@@ -120,7 +167,7 @@
                     this.invalidElements = invalidFields;
                     event.preventDefault();
                     // The warning method
-                    self.onInvalidation(invalidFields);
+                    self.publicInterface.onInvalidation(invalidFields);
                 }
             }
         },
@@ -135,11 +182,11 @@
             if (this.checkElementByPattern(target)) {
                 if (this.invalidElements.indexOf(target) > -1)
                     this.invalidElements.splice(this.invalidElements.indexOf(target), 1);
-                this.onValidation([target]);
+                this.publicInterface.onValidation([target]);
             } else {
                 if (this.invalidElements.indexOf(target) === -1)
                     this.invalidElements.push(target);
-                this.onInvalidation([target]);
+                this.publicInterface.onInvalidation([target]);
             }
         },
         /**
@@ -169,10 +216,10 @@
             }
         },
         /**
-         * Description of what this does.
+         * Performs the default invalidation
+         * action on invalid elements.
          *
-         * @param
-         * @returns
+         * @param       HTMLFormElement
          */
         onInvalidation: function (elements) {
             var elements = elements || [];
@@ -183,6 +230,12 @@
                     elements[i].focus();
             }
         },
+        /**
+         * Performs the default validation
+         * action on revalidated elements.
+         *
+         * @param       HTMLFormElement
+         */
         onValidation: function (elements) {
             var elements = elements || [];
             for (var i = 0; i < elements.length; i++) {
