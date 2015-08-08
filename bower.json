@@ -1,0 +1,38 @@
+{
+  "name": "Salvation",
+  "version": "0.5.0",
+  "homepage": "https://github.com/pkrll/Salvation",
+  "authors": [
+    "Ardalan Samimi <ardalan.samimi@gmail.com>"
+  ],
+  "description": "A pure JS form validation plugin",
+  "main": "src/salvation.js",
+  "moduleType": [
+    "globals"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/pkrll/Salvation.git"
+  },
+  "keywords": [
+      "validate",
+      "validation",
+      "form",
+      "js-plugin",
+      "javascript plugin",
+      "browser"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests",
+    "src",
+    ".*",
+    "package.json",
+    "screenshot*",
+    "npm-debug.log"
+  ]
+}

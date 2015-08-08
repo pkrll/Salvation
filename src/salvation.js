@@ -4,7 +4,7 @@
  *
  * Validates forms.
  *
- * @version 0.5.0
+ * @version 1.0.0
  * @author Ardalan Samimi
  */
 (function() {
@@ -150,10 +150,8 @@
          */
         deadValidation: function (event) {
             var self = this;
-            if (this.invalidElements.length > 0) {
+            if (this.invalidElements.length > 0)
                 event.preventDefault();
-
-            }
             // Even if the invalidElements count
             // does not indicate any invalidated
             // elements, the plugin should make
