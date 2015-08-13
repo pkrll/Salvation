@@ -1,4 +1,4 @@
-### Salvation
+## Salvation [![npm](https://img.shields.io/npm/v/salvation.svg)]() [![Bower](https://img.shields.io/bower/v/Salvation.svg)]() [![npm](https://img.shields.io/npm/l/salvation.svg)]()
 A lightweight, easy-to-use form validation tool, written entirely in JavaScript and with no library dependencies. Also, a work in progress.
 
 ### Installation
