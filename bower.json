@@ -1,6 +1,6 @@
 {
   "name": "Salvation",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "homepage": "https://github.com/pkrll/Salvation",
   "authors": [
     "Ardalan Samimi <ardalan.samimi@gmail.com>"
@@ -15,12 +15,12 @@
     "url": "git://github.com/pkrll/Salvation.git"
   },
   "keywords": [
-      "validate",
-      "validation",
-      "form",
-      "js-plugin",
-      "javascript plugin",
-      "browser"
+    "validate",
+    "validation",
+    "form",
+    "js-plugin",
+    "javascript plugin",
+    "browser"
   ],
   "license": "MIT",
   "ignore": [
