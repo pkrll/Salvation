@@ -4,13 +4,15 @@
  *
  * Validates forms.
  *
- * @version 1.0.0
+ * @version 1.1.0
  * @author Ardalan Samimi
  */
 (function() {
     // Only HTMLFormElements should be extended
     HTMLFormElement.prototype.addSalvation = function (options, rules) {
-        options.element = false;
+        var options = options || false, rules = rules || false;
+        if (options !== false)
+            options.element = false;
         return new Salvation(options, rules, this);
     }
     // The default settings
@@ -224,6 +226,9 @@
             for (var i = 0; i < elements.length; i++) {
                 if (elements[i].classList.contains(this.stylings.error) === false)
                     elements[i].classList.add(this.stylings.error);
+                var legend = elements[i].getAttribute("data-label") || "Invalid value given!";
+                var parent = elements[i].parentNode;
+                parent.setAttribute("data-hint", legend);
                 if (i === 0)
                     elements[i].focus();
             }
@@ -237,8 +242,11 @@
         onValidation: function (elements) {
             var elements = elements || [];
             for (var i = 0; i < elements.length; i++) {
-                if (elements[i].classList.contains(this.stylings.error))
+                if (elements[i].classList.contains(this.stylings.error)) {
                     elements[i].classList.remove(this.stylings.error);
+                    var parent = elements[i].parentNode;
+                    parent.removeAttribute("data-hint");
+                }
             }
         },
         /**
