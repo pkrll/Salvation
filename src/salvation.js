@@ -4,7 +4,7 @@
  *
  * Validates forms.
  *
- * @version 1.1.0
+ * @version 1.2.0
  * @author Ardalan Samimi
  */
 (function() {
@@ -25,11 +25,19 @@
         onInvalidation  : function(elements) {}
     }
     var patterns = {
-        required        :/\S/,
-        length          :'^(.{X,Y}$)',
-        numeric         :/^(\d)+$/,
-        alphanumeric    :/^([\d|\w])+$/,
-        email           :/^(\w+)[\@](([A-z1-9ÅåÄäÖö]+){3,63}\.[A-z]{2,})$/
+        required        : /\S/,
+        length          : '^(.{X,Y}$)',
+        numeric         : /^(\d)+$/,
+        alphanumeric    : /^([\d|\w])+$/,
+        email           : /^(\w+)[\@](([A-z1-9ÅåÄäÖö]+){3,63}\.[A-z]{2,})$/
+    }
+    var legends = {
+        required        : "This field can not be empty",
+        length          : "This field requires a given max/min length",
+        numeric         : "Only numeric values allowed",
+        alphanumeric    : "Only alphanumeric characters allowed",
+        email           : "Invalid e-mail",
+        unknown         : "Invalid value"
     }
     /**
      * Initialize the Salvation plugin.
@@ -46,12 +54,14 @@
             // the user defined and default patterns to make
             // sure that the defaults doesn't get overwritten.
             this.patterns = this.extend(paramPatterns, patterns);
+            this.legends = legends;
             this.stylings = {
                 error   : "salvation-error",
                 clear   : "salvation-clear"
             }
             this.publicInterface = this.setPublicInterface();
             this.invalidElements = [];
+            this.currentValidationType = null;
             // If the element was not created using the constructor pattern, the element
             // was not set in the options object and must have therefore been extended.
             this.element = (this.settings.element === false) ? element : this.settings.element;
@@ -167,7 +177,7 @@
                     this.invalidElements = invalidFields;
                     event.preventDefault();
                     // The warning method
-                    self.publicInterface.onInvalidation(invalidFields);
+                    self.publicInterface.onInvalidation(invalidFields, this.legends[validationType]);
                 }
             }
         },
@@ -186,7 +196,8 @@
             } else {
                 if (this.invalidElements.indexOf(target) === -1)
                     this.invalidElements.push(target);
-                this.publicInterface.onInvalidation([target]);
+                var legend = this.legends[this.currentValidationType] || this.legends.unknown;
+                this.publicInterface.onInvalidation([target], legend);
             }
         },
         /**
@@ -221,12 +232,12 @@
          *
          * @param       HTMLFormElement
          */
-        onInvalidation: function (elements) {
+        onInvalidation: function (elements, legend) {
             var elements = elements || [];
             for (var i = 0; i < elements.length; i++) {
                 if (elements[i].classList.contains(this.stylings.error) === false)
                     elements[i].classList.add(this.stylings.error);
-                var legend = elements[i].getAttribute("data-label") || "Invalid value given!";
+                var legend = elements[i].getAttribute("data-label") || legend;
                 var parent = elements[i].parentNode;
                 parent.setAttribute("data-hint", legend);
                 if (i === 0)
@@ -521,8 +532,10 @@
                 validationType = this.splitStringByComma(validationType);
                 for (var i = 0; i < validationType.length; i++) {
                     invalidElement = this.getElementsByPattern(elementAsArray, this.patterns[validationType[i]], validationType[i]);
-                    if (invalidElement.length > 0)
+                    if (invalidElement.length > 0) {
+                        this.currentValidationType = validationType[i];
                         return false;
+                    }
                 }
             }
             // As data-validate="length" has already been checked,
