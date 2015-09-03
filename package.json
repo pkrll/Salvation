@@ -1,6 +1,6 @@
 {
   "name": "salvation",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "A pure JS form validation plugin",
   "main": "src/salvation.js",
   "scripts": {

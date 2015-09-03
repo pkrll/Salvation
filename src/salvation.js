@@ -4,7 +4,7 @@
  *
  * Validates forms.
  *
- * @version 1.2.0
+ * @version 1.2.1
  * @author Ardalan Samimi
  */
 (function() {
@@ -37,6 +37,7 @@
         numeric         : "Only numeric values allowed",
         alphanumeric    : "Only alphanumeric characters allowed",
         email           : "Invalid e-mail",
+        date            : "Invalid date format",
         unknown         : "Invalid value"
     }
     /**
